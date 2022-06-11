@@ -48,27 +48,18 @@ class SimCLR(object):
         ##save config file
         saveFile(self.writer.log_dir, self.args)
         
-        ##log info
-
         for epoch in range(self.args.epochs):
             for images, label in tqdm(train_loader):
             
-                ###concat images
+                ###forward
                 images = torch.cat(images, dim=0)
                 images = images.to(self.args.device)
 
-                ###forward in simCLR
                 representations = self.model(images)
                 logits, labels = self.nceLoss(representations)
                 loss = self.criterion(logits, labels)
-
                 self.optimizer.zero_grad()
-
                 loss.backward()
-
-#                scaler.step(self.optimizer)
-#                scaler.update()
-
 
                 acc = accuracy(logits, labels)
                 self.writer.add_scalar('loss', loss, global_step=epoch)
@@ -89,18 +80,11 @@ class SimCLR(object):
 
         features = F.normalize(features, dim=1)
 
+        ###find the simiilarity matrix to be used in NCE loss
         similarity_matrix = torch.matmul(features, features.T)
-        # assert similarity_matrix.shape == (
-        #     self.args.n_views * self.args.batch_size, self.args.n_views * self.args.batch_size)
-        # assert similarity_matrix.shape == labels.shape
-
-        # discard the main diagonal from both: labels and similarities matrix
         mask = torch.eye(labels.shape[0], dtype=torch.bool).to(self.args.device)
         labels = labels[~mask].view(labels.shape[0], -1)
         similarity_matrix = similarity_matrix[~mask].view(similarity_matrix.shape[0], -1)
-        # assert similarity_matrix.shape == labels.shape
-
-        # select and combine multiple positives
         positives = similarity_matrix[labels.bool()].view(labels.shape[0], -1)
 
         # select only the negatives the negatives
